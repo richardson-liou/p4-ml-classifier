@@ -1,0 +1,18 @@
+# Compiled executables
+*.exe
+*.out
+*.o
+
+# Build folders
+build/
+cmake-build-*/
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Temporary files
+*.tmp
+*.swp
