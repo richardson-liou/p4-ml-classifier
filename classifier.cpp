@@ -7,13 +7,24 @@
 #include "csvstream.hpp"
 using namespace std;
 
-map<string,int> label_count;
-map<string,int> post_word_count;
-map<string,map<string,int>> label_word_count;
-set<string> vocabulary;
-int total_posts = 0;
+class Classifier{
+private: 
 
-set<string> find_unique_words(const string &str) {
+    map<string,int> label_count;
+    map<string,int> post_word_count;
+    map<string,map<string,int>> label_word_count;
+    set<string> vocabulary;
+    int total_posts = 0;
+
+    map<string,double> log_prior;
+    map<string,map<string,double>> log_likelihood;
+
+public:
+    void train(const string &train_filename);
+    set<string> find_unique_words(const string &str);
+};
+
+set<string> Classifier::find_unique_words(const string &str) {
     istringstream source(str);
     set<string> words;
     string word;
@@ -23,30 +34,14 @@ set<string> find_unique_words(const string &str) {
     return words;
 }
 
-int main(int argc, char *argv[]) {
-  cout.precision(3);
+void Classifier::train(const string &train_filename) {
+    csvstream train_file(train_filename);
 
-  if (argc != 2 && argc != 3) {
-      cout << "Usage: classifier.exe TRAIN_FILE [TEST_FILE]" << endl;
-      return 1;
-  }
+    map<string, string> row;
 
-  string train_filename = argv[1];
+    cout << "training data:" << endl;
 
-  ifstream fin(train_filename);
-  if (!fin.is_open()) {
-      cout << "Error opening file: " << train_filename << endl;
-      return 1;
-  }
-  fin.close();
-
-  csvstream train_file(train_filename);
-
-  cout << "training data:" << endl;
-
-  map<string, string> row;
-
-  while (train_file >> row) {
+    while (train_file >> row) {
         string label = row["tag"];
         string content = row["content"];
 
@@ -68,7 +63,28 @@ int main(int argc, char *argv[]) {
     cout << "trained on " << total_posts << " examples" << endl;
     cout << "vocabulary size = " << vocabulary.size() << endl;
     cout << endl;
+}
 
+int main(int argc, char *argv[]) {
+  cout.precision(3);
+  if (argc != 2 && argc != 3) {
+        cout << "Usage: classifier.exe TRAIN_FILE [TEST_FILE]" << endl;
+        return 1;
+    }
+
+    string train_filename = argv[1];
+    string test_filename = "";
+    if (argc == 3) {
+        test_filename = argv[2];
+    }
+
+    Classifier clf;
+    clf.train(train_filename);
+
+    if (!test_filename.empty()) {
+        // TODO: implement clf.predict_file(test_filename);
+    }
+    
   return 0;
 }
 
