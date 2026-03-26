@@ -16,13 +16,13 @@ private:
     set<string> vocabulary;
     int total_posts = 0;
 
-    map<string,double> log_prior;
-    map<string,map<string,double>> log_likelihood;
-
+    double get_log_prior(const string &label);
+    double get_log_likelihood(const string &label, const string &word);
 public:
     void train(const string &train_filename);
     set<string> find_unique_words(const string &str);
     pair<string, double> predict(const string &content);
+    void print_parameters();
 };
 
 set<string> Classifier::find_unique_words(const string &str) {
@@ -33,6 +33,55 @@ set<string> Classifier::find_unique_words(const string &str) {
         words.insert(word);
     }
     return words;
+}
+
+double Classifier::get_log_prior(const string &label) {
+    return log(static_cast<double>(label_count.at(label)) / total_posts);
+}
+
+double Classifier::get_log_likelihood(const string &label, const string &word) {
+    int label_total = label_count.at(label);
+    int word_in_label_count = 0;
+    
+    auto label_it = label_word_count.find(label);
+    if (label_it != label_word_count.end()) {
+        auto word_it = label_it->second.find(word);
+        if (word_it != label_it->second.end()) {
+            word_in_label_count = word_it->second;
+        }
+    }
+
+    int word_overall_count = 0;
+    auto overall_it = word_post_count.find(word);
+    if (overall_it != word_post_count.end()) {
+        word_overall_count = overall_it->second;
+    }
+
+    if (word_in_label_count > 0) {
+        return log(static_cast<double>(word_in_label_count) / label_total);
+    } else if (word_overall_count > 0) {
+        return log(static_cast<double>(word_overall_count) / total_posts);
+    } else {
+        return log(1.0 / total_posts);
+    }
+}
+
+void Classifier::print_parameters() {
+    cout << "classes:" << endl;
+    for (const auto &lc : label_count) {
+        cout << "  " << lc.first << ", " << lc.second
+             << " examples, log-prior = " << get_log_prior(lc.first) << endl;
+    }
+
+    cout << "classifier parameters:" << endl;
+    for (const auto &lc : label_count) {
+        for (const auto &wc : label_word_count.at(lc.first)) {
+            cout << "  " << lc.first << ":" << wc.first
+                 << ", count = " << wc.second
+                 << ", log-likelihood = " << get_log_likelihood(lc.first, wc.first) << endl;
+        }
+    }
+    cout << endl;
 }
 
 void Classifier::train(const string &train_filename) {
@@ -64,54 +113,29 @@ void Classifier::train(const string &train_filename) {
     cout << "trained on " << total_posts << " examples" << endl;
     cout << "vocabulary size = " << vocabulary.size() << endl;
     cout << endl;
+
+
 }
 
 pair <string, double> Classifier::predict(const string &content){
     set<string> words = find_unique_words(content);
-    vector<string> sorted_words(words.begin(), words.end());
-    sort(sorted_words.begin(), sorted_words.end());
 
     string best_label = "";
     double max_log_prob = -INFINITY;
 
     for (const auto &lc : label_count) {
         string label = lc.first;
-        int label_total = lc.second;
-        double log_prior = log(static_cast<double>(label_total) / total_posts);
+        double score = get_log_prior(label);
 
-        for (const string &word : sorted_words) {
-            int word_in_label_count = 0;
-            auto label_it = label_word_count.find(label);
-            if (label_it != label_word_count.end()) {
-                auto word_it = label_it->second.find(word);
-                if (word_it != label_it->second.end()) {
-                    word_in_label_count = word_it->second;
-                }
-            }
-
-            int word_overall_count = 0;
-            auto overall_it = word_post_count.find(word);
-            if (overall_it != word_post_count.end()) {
-                word_overall_count = overall_it->second;
-            }
-            
-            double log_likelihood;
-            if (word_in_label_count > 0) {
-                log_likelihood = log(static_cast<double>(word_in_label_count) / label_total);
-            } else if (word_overall_count > 0) {
-                log_likelihood = log(static_cast<double>(word_overall_count) / total_posts);
-            } else {
-                log_likelihood = log(1.0 / total_posts);
-            }
-
-            log_prior += log_likelihood;
+        for (const string &word : words) {
+            score += get_log_likelihood(label, word);
         }
-
-        if (log_prior > max_log_prob || (log_prior == max_log_prob && label < best_label)) {
-            max_log_prob = log_prior;
-            best_label = label;
-        }
+    
+    if (score > max_log_prob || (score == max_log_prob && label < best_label)) {
+        max_log_prob = score;
+        best_label = label;
     }
+}
 
     return {best_label, max_log_prob};
 }
@@ -119,27 +143,48 @@ pair <string, double> Classifier::predict(const string &content){
 int main(int argc, char *argv[]) {
   cout.precision(3);
   if (argc != 2 && argc != 3) {
-        cout << "Usage: classifier.exe TRAIN_FILE [TEST_FILE]" << endl;
-        return 1;
+    cout << "Usage: classifier.exe TRAIN_FILE [TEST_FILE]" << endl;
+    return 1;
     }
 
     string train_filename = argv[1];
+    ifstream train_check(train_filename);
+    if (!train_check.is_open()) {
+        cout << "Error opening file: " << train_filename << endl;
+        return 1;
+    }
+    train_check.close();
+
     string test_filename = "";
     if (argc == 3) {
         test_filename = argv[2];
     }
+    if (!test_filename.empty()) {
+    ifstream test_check(test_filename);
+    if (!test_check.is_open()) {
+        cout << "Error opening file: " << test_filename << endl;
+        return 1;
+    }
+    test_check.close();
+}
 
     Classifier clf;
     clf.train(train_filename);
 
+    if (test_filename.empty()) {
+        clf.print_parameters();
+        return 0;
+    }
+
     if (!test_filename.empty()) {
         csvstream test_file(test_filename);
+
         map<string, string> row;
         int correct = 0;
         int total = 0;
-        
-        cout << "Predictions:" << endl;
 
+
+        cout << "test data: " << endl;
         while (test_file >> row) {
             string correct_label = row["tag"];
             string content = row["content"];
@@ -154,7 +199,9 @@ int main(int argc, char *argv[]) {
             cout << "  content = " << content << endl;
             cout << endl;
 
-            if (predicted_label == correct_label) correct++;
+            if (predicted_label == correct_label) {
+                correct++;
+            }
             total++;
         }
 
@@ -163,4 +210,5 @@ int main(int argc, char *argv[]) {
     }
   return 0;
 }
+
 
