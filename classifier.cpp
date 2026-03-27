@@ -164,7 +164,7 @@ pair <string, double> Classifier::predict(const string &content){
             score += get_log_likelihood(label, word);
         }
     
-    if (score > max_log_prob) {
+    if (score > max_log_prob || (score == max_log_prob && label < best_label)) {
         max_log_prob = score;
         best_label = label;
     }
@@ -173,6 +173,11 @@ pair <string, double> Classifier::predict(const string &content){
     return {best_label, max_log_prob};
 }
 
+// REQUIRES: train() has been called, there is a valid test_filename
+//           CSV file with "tag" and "content" columns
+// EFFECTS: predicts labels for each post in test_filename using predict(), 
+//          prints correct label, predicted label, log-probability score,
+//          and content for each post, then prints overall performance
 void Classifier::run_tests(const string &test_filename) {
     csvstream test_file(test_filename);
     map<string, string> row;
