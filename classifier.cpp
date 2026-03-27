@@ -28,10 +28,13 @@ public:
     void run_tests(const string &test_filename);
 };
 
-
+// EFFECTS: returns total number of posts 
 int Classifier::get_total_posts() const{
     return total_posts;
 }
+
+// REQUIRES: str is a valid string
+// EFFECTS: returns a set of unique words in str
 set<string> Classifier::find_unique_words(const string &str) {
     istringstream source(str);
     set<string> words;
@@ -42,10 +45,15 @@ set<string> Classifier::find_unique_words(const string &str) {
     return words;
 }
 
+// REQUIRES: label is a key in label_count, total_posts > 0
+// EFFECTS: returns the log prior probability of the label
 double Classifier::get_log_prior(const string &label) {
     return log(static_cast<double>(label_count.at(label)) / total_posts);
 }
 
+// REQUIRES: label is a key in label_count, total_posts > 0
+// EFFECTS: returns the log likelihood of word given label, using different equation
+//          if word was not seen in label or not seen in training data at all
 double Classifier::get_log_likelihood(const string &label, const string &word) {
     int label_total = label_count.at(label);
     int word_in_label_count = 0;
@@ -73,6 +81,9 @@ double Classifier::get_log_likelihood(const string &label, const string &word) {
     }
 }
 
+// REQUIRES: train() was called
+// EFFECTS: prints classes, log-priors and classifier parameters
+//          with counts and log-likelihoods for each label and word
 void Classifier::print_parameters() {
     cout << "classes:" << endl;
     for (const auto &lc : label_count) {
@@ -92,6 +103,13 @@ void Classifier::print_parameters() {
     cout << endl;
 }
 
+// REQUIRES: train_filename is a valid CSV file with "tag" and 
+//           "content" columns
+// MODIFIES: label_count, word_post_count, label_word_count, vocabulary,
+//           total_posts
+// EFFECTS: trains the classifier with training data and updates counts.
+//          if print is true, prints training data, vocabulary size, and
+//          number of examples. always prints "trained on X examples" 
 void Classifier::train(const string &train_filename, bool print) {
     csvstream train_file(train_filename);
 
@@ -127,11 +145,11 @@ void Classifier::train(const string &train_filename, bool print) {
         cout << "vocabulary size = " << vocabulary.size() << endl;
         cout << endl;
 }
-    
-
-
 }
 
+// REQUIRES: train() has been called on csv file where content comes from
+// EFFECTS: returns the predicted label and its log-probability score
+//          for the given content
 pair <string, double> Classifier::predict(const string &content){
     set<string> words = find_unique_words(content);
 
