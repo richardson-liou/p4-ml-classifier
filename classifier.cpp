@@ -4,6 +4,7 @@
 #include <sstream>
 #include <set>
 #include <map>
+#include <cmath>
 #include "csvstream.hpp"
 using namespace std;
 
@@ -19,12 +20,14 @@ private:
     double get_log_prior(const string &label);
     double get_log_likelihood(const string &label, const string &word);
 public:
-    void train(const string &train_filename);
+    void train(const string &train_filename, bool print);
     set<string> find_unique_words(const string &str);
     pair<string, double> predict(const string &content);
     void print_parameters();
     int get_total_posts() const;
+    void run_tests(const string &test_filename);
 };
+
 
 int Classifier::get_total_posts() const{
     return total_posts;
@@ -82,25 +85,30 @@ void Classifier::print_parameters() {
         for (const auto &wc : label_word_count.at(lc.first)) {
             cout << "  " << lc.first << ":" << wc.first
                  << ", count = " << wc.second
-                 << ", log-likelihood = " << get_log_likelihood(lc.first, wc.first) << endl;
+                 << ", log-likelihood = " 
+                 << get_log_likelihood(lc.first, wc.first) << endl;
         }
     }
     cout << endl;
 }
 
-void Classifier::train(const string &train_filename) {
+void Classifier::train(const string &train_filename, bool print) {
     csvstream train_file(train_filename);
 
     map<string, string> row;
 
-    cout << "training data:" << endl;
+    if (print){
+        cout << "training data:" << endl;
+    }
 
     while (train_file >> row) {
         string label = row["tag"];
         string content = row["content"];
 
-        cout << "  label = " << label
+        if (print){ 
+            cout << "  label = " << label
              << ", content = " << content << endl;
+        }
 
         total_posts++;
         label_count[label]++;
@@ -115,8 +123,11 @@ void Classifier::train(const string &train_filename) {
     }
 
     cout << "trained on " << total_posts << " examples" << endl;
-    cout << "vocabulary size = " << vocabulary.size() << endl;
-    cout << endl;
+    if (print){ 
+        cout << "vocabulary size = " << vocabulary.size() << endl;
+        cout << endl;
+}
+    
 
 
 }
@@ -142,6 +153,34 @@ pair <string, double> Classifier::predict(const string &content){
 }
 
     return {best_label, max_log_prob};
+}
+
+void Classifier::run_tests(const string &test_filename) {
+    csvstream test_file(test_filename);
+    map<string, string> row;
+    int correct = 0;
+    int total = 0;
+
+    cout << "test data:" << endl;
+    while (test_file >> row) {
+        string correct_label = row["tag"];
+        string content = row["content"];
+
+        pair<string, double> result = predict(content);
+        string predicted_label = result.first;
+        double log_prob = result.second;
+
+        cout << "  correct = " << correct_label
+             << ", predicted = " << predicted_label
+             << ", log-probability score = " << log_prob << endl;
+        cout << "  content = " << content << endl;
+        cout << endl;
+
+        if (predicted_label == correct_label) correct++;
+        total++;
+    }
+    cout << "performance: " << correct << " / " << total
+         << " posts predicted correctly" << endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -170,47 +209,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     test_check.close();
-}
-
+}   
     Classifier clf;
-    clf.train(train_filename);
-
     if (test_filename.empty()) {
+        clf.train(train_filename, true);
         clf.print_parameters();
         return 0;
     }
 
-    if (!test_filename.empty()) {
-        csvstream test_file(test_filename);
+    clf.train(train_filename, false);
+    clf.run_tests(test_filename);
+    return 0;
 
-        map<string, string> row;
-        int correct = 0;
-        int total = 0;
-
-        cout << "trained on " << clf.get_total_posts() << " examples" << endl;
-        cout << "test data: " << endl;
-        while (test_file >> row) {
-            string correct_label = row["tag"];
-            string content = row["content"];
-
-            pair<string, double> result = clf.predict(content);
-            string predicted_label = result.first;
-            double log_prob = result.second;
-
-            cout << "  correct = " << correct_label
-                 << ", predicted = " << predicted_label
-                 << ", log-probability score = " << log_prob << endl;
-            cout << "  content = " << content << endl;
-            cout << endl;
-
-            if (predicted_label == correct_label) {
-                correct++;
-            }
-            total++;
-        }
-
-        cout << "performance: " << correct << " / " << total
-             << " posts predicted correctly" << endl;
-    }
-  return 0;
 }
