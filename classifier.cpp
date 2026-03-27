@@ -23,8 +23,12 @@ public:
     set<string> find_unique_words(const string &str);
     pair<string, double> predict(const string &content);
     void print_parameters();
+    int get_total_posts() const;
 };
 
+int Classifier::get_total_posts() const{
+    return total_posts;
+}
 set<string> Classifier::find_unique_words(const string &str) {
     istringstream source(str);
     set<string> words;
@@ -131,7 +135,7 @@ pair <string, double> Classifier::predict(const string &content){
             score += get_log_likelihood(label, word);
         }
     
-    if (score > max_log_prob || (score == max_log_prob && label < best_label)) {
+    if (score > max_log_prob) {
         max_log_prob = score;
         best_label = label;
     }
@@ -183,7 +187,7 @@ int main(int argc, char *argv[]) {
         int correct = 0;
         int total = 0;
 
-
+        cout << "trained on " << clf.get_total_posts() << " examples" << endl;
         cout << "test data: " << endl;
         while (test_file >> row) {
             string correct_label = row["tag"];
@@ -210,5 +214,3 @@ int main(int argc, char *argv[]) {
     }
   return 0;
 }
-
-
